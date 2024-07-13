@@ -299,17 +299,29 @@ public static class GetReplayDataSegmentClass
             bytes3[32] = 0x90;
             bytes3[33] = 0x90;
             bytes3[34] = 0x90;
-            bytes3[35] = 0x90;
+            bytes3[35] = 0x90;//ret 0
 
             bytes3[0x38] = 0x77;
             bytes3[0x39] = 0xBF;
             bytes3[0x3A] = 0x90;
             bytes3[0x3B] = 0x90;
             bytes3[0x3C] = 0x90;
-            bytes3[0x3D] = 0x90;
+            bytes3[0x3D] = 0x90;//ret 0
+
+            bytes3[0x48] = 0x5D;
+            bytes3[0x49] = 0x3C;
+            bytes3[0x4A] = 0xCA;
+            bytes3[0x4B] = 0xFF;//CALL CopyMem
+
+            bytes3[0x58] = 0x4D;
+            bytes3[0x59] = 0x3C;
+            bytes3[0x5A] = 0xCA;
+            bytes3[0x5B] = 0xFF;//CALL CopyMem
 
             bytes3[0x5F] = 0xEB;
             bytes3[0x60] = 0x9B;
+
+            
 
             return [..bytes1,..bytes2,..bytes3];
         }
