@@ -1,5 +1,9 @@
+using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using FFXIVClientStructs.FFXIV.Client.System.String;
+using Hypostasis.Debug;
+using static Hypostasis.Game.Structures.ContentsReplayModule;
 
 namespace Hypostasis.Game.Structures;
 
@@ -145,7 +149,7 @@ public unsafe partial struct ContentsReplayModule : IHypostasisStructure
     }
 
     public delegate FFXIVReplay.DataSegment* GetReplayDataSegmentDelegate(ContentsReplayModule* contentsReplayModule);
-    public static readonly GameFunction<GetReplayDataSegmentDelegate> getReplayDataSegment = new("40 53 48 83 EC 20 8B 81 90 00 00 00");
+    public static GameFunction<GetReplayDataSegmentDelegate> getReplayDataSegment;
     public FFXIVReplay.DataSegment* GetReplayDataSegment()
     {
         fixed (ContentsReplayModule* ptr = &this)
@@ -199,4 +203,121 @@ public unsafe partial struct ContentsReplayModule : IHypostasisStructure
     }
 
     public bool Validate() => true;
+}
+public class InlineFunction<T> : GameFunction<T>,IDisposable where T : Delegate
+{
+    public nint NativePtr;
+    private uint NativePtrLength;
+    private byte[] _oldCode;
+    private nint _patchAddress;
+    private bool hasAlloc = false;
+    private bool hasPatch = false;
+
+    public InlineFunction(nint codeCave, string sig, byte[] preCallPatch, byte[] postCallPatch, byte[] funcCode) : base()
+    {
+        try
+        {
+            //NativePtrLength = (((uint)(funcCode.Length / 1024f)) + 1) * 1024;
+            //NativePtr = Win32API.VirtualAlloc(nint.Zero, NativePtrLength, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+            NativePtr = codeCave;
+            hasAlloc = true;
+            _patchAddress = DalamudApi.SigScanner.ScanText(sig);
+            SafeMemory.WriteBytes(NativePtr, funcCode);
+            int offset = (int)(NativePtr - (_patchAddress+preCallPatch.Length+5));
+            byte[] CallCode = [
+                0xE8, (byte)(offset&0xff) , (byte)( (offset>>8)& 0xff), (byte)( (offset>>16)& 0xff), (byte)( (offset>>24)& 0xff)// jmp NativePtr
+                ];
+            var RealCode = preCallPatch.Concat(CallCode).Concat(postCallPatch).ToArray();
+            SafeMemory.ReadBytes(_patchAddress, RealCode.Length, out var code);
+            _oldCode = code;
+            SafeMemory.WriteBytes(_patchAddress, RealCode);
+            hasPatch = true;
+        }
+        catch 
+        {
+            //if (hasAlloc)
+            //{
+            //    Win32API.VirtualFree(NativePtr, NativePtrLength, MEM_RESERVE);
+            //}
+            //if (hasPatch)
+            //{
+            //    SafeMemory.WriteBytes(_patchAddress, _oldCode);
+            //}
+            throw;
+        }
+    }
+    protected override nint ScanAddress()
+    {
+        return NativePtr;
+    }
+
+    void IDisposable.Dispose()
+    {
+        if(Hook != null && Hook.IsEnabled)
+        {
+            Hook.Dispose();
+        }
+        SafeMemory.WriteBytes(_patchAddress, _oldCode);
+        //Win32API.VirtualFree(NativePtr, NativePtrLength, MEM_RESERVE);
+    }
+
+    public const uint MEM_COMMIT = 0x1000;
+    public const uint MEM_RESERVE = 0x2000;
+
+    public const uint PAGE_EXECUTE_READWRITE = 0x40;
+}
+file static class Win32API
+{
+    [DllImport("kernel32", SetLastError = true)]
+    public static extern IntPtr VirtualAlloc(IntPtr lpAddress, uint dwSize, uint flAllocationType, uint flProtect);
+
+    [DllImport("kernel32", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool VirtualFree(IntPtr lpAddress, uint dwSize, uint dwFreeType);
+}
+public static class GetReplayDataSegmentClass
+{
+    public static byte[] preCallPatch = [
+        0x48, 0x89, 0xD9 //mov rcx,rbx
+        ];
+    public static byte[] postCallPatch = [
+        0x49, 0x89, 0xC6 // mov r14,rax
+        , 0xEB, 0x30 //jmp
+        ];
+    public static byte[] shellCode
+    {
+        get
+        {
+            SafeMemory.ReadBytes(Code1, 16, out var bytes1);
+            bytes1[14] = 0x74;
+            bytes1[15] = 0x07;
+            byte[] bytes2 = [0x4D,0x09,0xF6,0x4C,0x89,0xF0,0xC3];
+            SafeMemory.ReadBytes(Code2, 0x62, out var bytes3);
+
+            bytes3[30] = 0x76;
+            bytes3[31] = 0xd9;
+            bytes3[32] = 0x90;
+            bytes3[33] = 0x90;
+            bytes3[34] = 0x90;
+            bytes3[35] = 0x90;
+
+            bytes3[0x38] = 0x77;
+            bytes3[0x39] = 0xBF;
+            bytes3[0x3A] = 0x90;
+            bytes3[0x3B] = 0x90;
+            bytes3[0x3C] = 0x90;
+            bytes3[0x3D] = 0x90;
+
+            bytes3[0x5F] = 0xEB;
+            bytes3[0x60] = 0x9B;
+
+            return [..bytes1,..bytes2,..bytes3];
+        }
+    }
+
+
+    public static nint CopyMem => DalamudApi.SigScanner.ScanText("E8 ?? ?? ?? ?? 66 44 89 74 1C");
+    public static string sig = "48 ?? ?? ?? 48 ?? ?? ?? ?? ?? ?? 48 ?? ?? 0F 87 ?? ?? ?? ?? 48";
+    public static nint Code1 => DalamudApi.SigScanner.ScanText(sig);
+    public static nint Code2 => DalamudApi.SigScanner.ScanText("48 ?? ?? ?? 48 ?? ?? ?? 4C ?? ?? ?? 41 ?? ?? ?? ?? 48 ?? ?? 48");
 }
