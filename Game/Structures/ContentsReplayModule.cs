@@ -308,14 +308,14 @@ public static class GetReplayDataSegmentClass
             bytes3[0x3C] = 0x90;
             bytes3[0x3D] = 0x90;//ret 0
 
-            long next = CopyMem -(Address + 16 + 7 + 0x4d);
+            long next = CopyMem -(Address + 16 + 7 + 0x4c);
 
             bytes3[0x48] = (byte)(next & 0xff);
             bytes3[0x49] = (byte)(next>>8 & 0xff);
             bytes3[0x4A] = (byte)(next >> 16 & 0xff); 
             bytes3[0x4B] = (byte)(next >> 24 & 0xff); //CALL CopyMem
 
-            next = CopyMem - (Address + 16 + 7 + 0x5d);
+            next = CopyMem - (Address + 16 + 7 + 0x5c);
 
             bytes3[0x58] = (byte)(next & 0xff);
             bytes3[0x59] = (byte)(next >> 8 & 0xff);
