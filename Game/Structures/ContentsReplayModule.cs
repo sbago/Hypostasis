@@ -308,15 +308,19 @@ public static class GetReplayDataSegmentClass
             bytes3[0x3C] = 0x90;
             bytes3[0x3D] = 0x90;//ret 0
 
-            bytes3[0x48] = 0x5D;
-            bytes3[0x49] = 0x3C;
-            bytes3[0x4A] = 0xCA;
-            bytes3[0x4B] = 0xFF;//CALL CopyMem
+            long next = CopyMem -(Address + 16 + 7 + 0x4c);
 
-            bytes3[0x58] = 0x4D;
-            bytes3[0x59] = 0x3C;
-            bytes3[0x5A] = 0xCA;
-            bytes3[0x5B] = 0xFF;//CALL CopyMem
+            bytes3[0x48] = (byte)(next & 0xff);
+            bytes3[0x49] = (byte)(next>>8 & 0xff);
+            bytes3[0x4A] = (byte)(next >> 16 & 0xff); 
+            bytes3[0x4B] = (byte)(next >> 24 & 0xff); //CALL CopyMem
+
+            next = CopyMem - (Address + 16 + 7 + 0x5c);
+
+            bytes3[0x58] = (byte)(next & 0xff);
+            bytes3[0x59] = (byte)(next >> 8 & 0xff);
+            bytes3[0x5A] = (byte)(next >> 16 & 0xff);
+            bytes3[0x5B] = (byte)(next >> 24 & 0xff); ;//CALL CopyMem
 
             bytes3[0x5F] = 0xEB;
             bytes3[0x60] = 0x9B;
@@ -332,4 +336,5 @@ public static class GetReplayDataSegmentClass
     public static string sig = "48 ?? ?? ?? 48 ?? ?? ?? ?? ?? ?? 48 ?? ?? 0F 87 ?? ?? ?? ?? 48";
     public static nint Code1 => DalamudApi.SigScanner.ScanText(sig);
     public static nint Code2 => DalamudApi.SigScanner.ScanText("48 ?? ?? ?? 48 ?? ?? ?? 4C ?? ?? ?? 41 ?? ?? ?? ?? 48 ?? ?? 48");
+    public static nint Address => DalamudApi.SigScanner.BaseRDataAddress-0x100;
 }
